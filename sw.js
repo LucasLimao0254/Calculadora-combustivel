@@ -2,13 +2,14 @@
 // - Página (navegação): rede primeiro, para pegar sempre a versão nova; sem rede, usa o cache.
 // - Chart.js, fontes e ícones: cache primeiro, atualizando em segundo plano.
 // Mude VERSAO para forçar a limpeza dos caches antigos.
-const VERSAO = "v1";
+const VERSAO = "v2";
 const CACHE = "calc-reajuste-" + VERSAO;
 const BASE = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./icons/favicon-32.png",
   "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => Promise.all(BASE.map(u => c.add(u).catch(() => {})))).then(() => self.skipWaiting()));
+  // cache: "reload" ignora o cache HTTP do navegador (o GitHub Pages guarda arquivos por 10 min)
+  e.waitUntil(caches.open(CACHE).then(c => Promise.all(BASE.map(u => c.add(new Request(u, { cache: "reload" })).catch(() => {})))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", e => {
@@ -22,7 +23,8 @@ self.addEventListener("fetch", e => {
   const url = new URL(req.url);
 
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).then(res => {
+    // no-cache: sempre confere com o servidor (ETag), para não abrir uma versão antiga da página
+    e.respondWith(fetch(req.url, { cache: "no-cache", credentials: "same-origin" }).then(res => {
       if (res.ok) { const copia = res.clone(); caches.open(CACHE).then(c => c.put("./index.html", copia)); }
       return res;
     }).catch(() => caches.match("./index.html").then(r => r || caches.match("./"))));
