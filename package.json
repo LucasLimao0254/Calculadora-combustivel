@@ -1,0 +1,13 @@
+{
+  "name": "calculadora-combustivel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Calculadora de reajuste de preços de combustível: custo, lucro e margem por litro, com histórico e gráfico.",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "build:real": "node scripts/build.js --dados dados-reais",
+    "check": "node scripts/build.js --check",
+    "exemplo": "node scripts/gerar-exemplo.js",
+    "test": "node tests/verificar_calculos.js && node scripts/build.js --check"
+  }
+}

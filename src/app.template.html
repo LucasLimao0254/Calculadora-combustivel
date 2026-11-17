@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" data-own>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" data-own>
+<meta name="theme-color" content="#18222b" data-own>
+<title data-own>Calculadora de Reajuste</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" data-own>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin data-own>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet" data-own>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" data-own></script>
+<style data-own>
+/* Layout: menu lateral (hambúrguer) + três telas: Dashboard (gráfico → média atual → novo reajuste), Histórico, Configurações */
+:root{
+  --bg:#f3f4f2; --surface:#ffffff; --ink:#18222b; --muted:#5d6872; --line:#d9ddd8; --field:#f7f8f6;
+  --primary:#18222b; --primary-ink:#ffffff; --focus:#2a78d6;
+  --good:#1f7a4d; --bad:#b3261e;
+  --s-gas:#eb6834; --s-adt:#2a78d6; --s-s10:#1baf7a; --s-s500:#eda100; --s-avg:#18222b;
+  --grid:rgba(24,34,43,.08);
+  --f-display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#11161b; --surface:#1a1a19; --ink:#f0efec; --muted:#a3a9ae; --line:#2f3438; --field:#141618;
+    --primary:#f0efec; --primary-ink:#141618; --focus:#3987e5;
+    --good:#4fc386; --bad:#ff7b72;
+    --s-gas:#d95926; --s-adt:#3987e5; --s-s10:#199e70; --s-s500:#c98500; --s-avg:#f0efec;
+    --grid:rgba(240,239,236,.08);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11161b; --surface:#1a1a19; --ink:#f0efec; --muted:#a3a9ae; --line:#2f3438; --field:#141618;
+  --primary:#f0efec; --primary-ink:#141618; --focus:#3987e5;
+  --good:#4fc386; --bad:#ff7b72;
+  --s-gas:#d95926; --s-adt:#3987e5; --s-s10:#199e70; --s-s500:#c98500; --s-avg:#f0efec;
+  --grid:rgba(240,239,236,.08);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.4;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--surface);padding:8px 14px;font-weight:500;min-height:40px}
+button:hover{border-color:var(--muted)}
+button.primary{background:var(--primary);color:var(--primary-ink);border-color:var(--primary);font-weight:600}
+button.danger{color:var(--bad)}
+button.link{border:0;background:none;padding:4px 0;min-height:0;color:var(--focus);font-weight:600}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+
+/* Barra superior + menu */
+.top{position:sticky;top:0;z-index:6;background:var(--bg);display:flex;align-items:center;gap:10px;
+  padding:max(10px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left));border-bottom:1px solid var(--line)}
+.top h1{font-family:var(--f-display);font-weight:700;font-size:24px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.burger{width:44px;height:44px;padding:0;display:grid;place-items:center}
+.burger svg{width:22px;height:22px}
+.scrim{position:fixed;inset:0;background:rgba(10,14,18,.45);z-index:20;opacity:0;pointer-events:none;transition:opacity .2s}
+.drawer{position:fixed;top:0;bottom:0;left:0;z-index:21;width:min(290px,84vw);background:var(--surface);border-right:1px solid var(--line);
+  transform:translateX(-102%);transition:transform .22s ease;display:flex;flex-direction:column;
+  padding:max(16px,env(safe-area-inset-top)) 12px max(16px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+body.menu-open .drawer{transform:none}
+body.menu-open .scrim{opacity:1;pointer-events:auto}
+.drawer .brand{font-family:var(--f-display);font-weight:700;font-size:22px;padding:6px 10px 16px;border-bottom:1px solid var(--line);margin-bottom:10px}
+.drawer .brand small{display:block;font-family:var(--f-body);font-weight:400;font-size:13px;color:var(--muted)}
+.drawer nav{display:grid;gap:4px}
+.drawer a{display:flex;align-items:center;gap:12px;padding:12px 10px;border-radius:8px;color:var(--ink);text-decoration:none;font-weight:500;min-height:48px}
+.drawer a svg{width:20px;height:20px;flex:none;color:var(--muted)}
+.drawer a:hover{background:var(--field)}
+.drawer a[aria-current="page"]{background:var(--field);font-weight:600;box-shadow:inset 3px 0 0 var(--primary)}
+.drawer a[aria-current="page"] svg{color:var(--ink)}
+.drawer .sync{margin-top:auto;font-size:12.5px;color:var(--muted);padding:10px}
+@media (prefers-reduced-motion:reduce){.drawer,.scrim{transition:none}}
+
+main{max-width:1080px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-right)) 48px max(16px,env(safe-area-inset-left))}
+.view{display:grid;gap:16px}
+.view>*,.grid>*,.inputs>*,.summary>*,.cur-fuels>*,.perfuel>*{min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:14px}
+.panel-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px}
+h2{font-family:var(--f-display);font-weight:600;font-size:22px;margin:0;text-wrap:balance}
+.sub{font-size:13.5px;color:var(--muted)}
+
+/* Filtros do gráfico */
+.filters{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--field)}
+.seg button{border:0;border-radius:0;background:transparent;color:var(--muted);min-height:38px;padding:6px 12px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button{white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--primary);color:var(--primary-ink);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:14px;color:var(--muted)}
+.chip .mk{width:14px;height:14px;display:inline-block;flex:none}
+.chip[aria-pressed="true"]{color:var(--ink);border-color:var(--ink);font-weight:600}
+.chip[aria-pressed="false"] .mk{opacity:.35}
+.range{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px;color:var(--muted)}
+.range select{min-height:38px;border:1px solid var(--line);border-radius:8px;background:var(--field);padding:4px 8px}
+.chart-box{position:relative;height:300px}
+.chart-msg{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px;text-align:center;padding:16px}
+
+/* Marcadores (forma + cor identificam o combustível) */
+.mk svg{width:100%;height:100%;display:block}
+
+/* Média atual */
+.current{grid-template-columns:minmax(0,1fr) minmax(0,2fr);align-items:center}
+.big .lbl{font-size:14px;color:var(--muted)}
+.big .val{font-family:var(--f-display);font-weight:700;font-size:44px;line-height:1.05;font-variant-numeric:tabular-nums}
+.big .meta{font-size:13.5px;color:var(--muted)}
+.delta{display:inline-block;font-size:13px;font-weight:600;border-radius:999px;padding:1px 9px;margin-left:6px;vertical-align:middle}
+.delta.up{background:color-mix(in srgb,var(--good) 14%,transparent);color:var(--good)}
+.delta.down{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+.delta.eq{background:var(--field);color:var(--muted)}
+.cur-fuels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.cf{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px}
+.cf .n{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);white-space:nowrap}
+.cf .n .mk{width:12px;height:12px}
+.cf .v{font-family:var(--f-display);font-weight:600;font-size:22px;font-variant-numeric:tabular-nums}
+.cf .p{font-size:14px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.big .val .pct{font-size:.55em;font-weight:600;color:var(--muted)}
+@media (max-width:820px){.current{grid-template-columns:1fr}.cur-fuels{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Novo reajuste */
+.cfgline{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13.5px;color:var(--muted);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:44px;width:100%;text-align:left}
+.cfgline b{color:var(--ink);font-weight:600}
+.cfgline .edit{color:var(--focus);font-weight:600;white-space:nowrap}
+.summary{border:1px solid var(--line);border-radius:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:hidden}
+.stat{padding:10px 14px;display:grid;gap:2px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.stat{border-bottom:0}.stat:last-child{border-right:0}
+.stat .delta{justify-self:start;margin:2px 0 0}
+.stat .lbl{font-size:13px;color:var(--muted)}
+.stat .val{font-family:var(--f-display);font-weight:600;font-size:22px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:720px){.grid{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);border-radius:12px;padding:12px 14px 14px;display:grid;gap:10px;position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:var(--c)}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:2px}
+.card h3{display:flex;align-items:center;gap:8px;font-family:var(--f-display);font-weight:600;font-size:20px;margin:0;padding-top:2px}
+.card h3 .mk{width:14px;height:14px}
+.margin{font-size:13px;font-weight:600;border-radius:999px;padding:2px 10px;font-variant-numeric:tabular-nums;background:color-mix(in srgb,var(--good) 14%,transparent);color:var(--good);white-space:nowrap}
+.margin.neg{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+.inputs{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:8px}
+.f{display:grid;gap:4px}
+.f label{font-size:13px;color:var(--muted);font-weight:500}
+.inp{display:flex;align-items:center;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:0 10px;min-height:46px}
+.inp:focus-within{border-color:var(--focus)}
+.inp span{color:var(--muted);font-size:14px;white-space:nowrap}
+.inp input{flex:1;min-width:0;width:100%;border:0;background:transparent;font:600 21px/1 var(--f-display);font-variant-numeric:tabular-nums;padding:10px 6px;text-align:right}
+.inp input:focus{outline:none}
+.res{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 16px;border-top:1px dashed var(--line);padding-top:10px;font-size:14px;margin:0}
+.res div{display:flex;justify-content:space-between;gap:8px}
+.res dt{color:var(--muted)}
+.res dd{margin:0;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.res .bd{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
+.save-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;justify-content:space-between;border-top:1px solid var(--line);padding-top:14px}
+.save-row .meta{display:flex;flex-wrap:wrap;gap:10px}
+.save-row .f input{min-height:44px;border:1px solid var(--line);border-radius:8px;background:var(--field);padding:6px 10px}
+.save-row .btns{display:flex;gap:8px}
+
+/* Histórico */
+.hist{display:grid;gap:10px}
+.hi{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.hi-h{display:grid;grid-template-columns:minmax(0,1.3fr) repeat(2,minmax(0,1fr));gap:10px;align-items:center;padding:12px 16px}
+.hi-h .t{font-family:var(--f-display);font-weight:600;font-size:20px}
+.hi-h .d{font-size:13px;color:var(--muted)}
+.hi-h .m .lbl{font-size:12px;color:var(--muted)}
+.hi-h .m .v{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hi details{border-top:1px solid var(--line)}
+.hi summary{cursor:pointer;padding:10px 16px;font-size:14px;color:var(--muted);list-style:none;display:flex;justify-content:flex-start;gap:8px;min-height:44px;align-items:center}
+.hi summary::-webkit-details-marker{display:none}
+.hi summary::after{content:"Detalhes ▾";font-weight:600;color:var(--focus)}
+.hi details[open] summary::after{content:"Ocultar ▴"}
+.hi .body{padding:0 16px 14px;display:grid;gap:12px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{font-weight:600;color:var(--muted);font-size:12.5px;background:var(--field)}
+th:first-child,td:first-child{text-align:left}
+tr:last-child td{border-bottom:0}
+.hi .acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.hi .acts label{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.hi .acts input[type=date]{min-height:40px;border:1px solid var(--line);border-radius:8px;background:var(--field);padding:4px 8px}
+@media (max-width:640px){
+  .hi-h{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px 14px}
+  .hi-h .head{grid-column:1/-1}
+}
+
+/* Configurações */
+.cfg-form{display:grid;gap:18px;max-width:520px}
+.cfg-form section{display:grid;gap:8px}
+.cfg-form h3{margin:0;font-size:15px;font-weight:600}
+.hint{margin:0;font-size:13px;color:var(--muted)}
+.row-btns{display:flex;flex-wrap:wrap;gap:8px}
+.hint.err{color:var(--bad)}
+.perfuel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.seg.wide{display:grid;grid-template-columns:1fr 1fr}
+.seg.wide button{min-height:44px}
+
+/* Barra inferior (mobile) e aviso */
+.mbar{display:none}
+.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+
+@media (max-width:640px){
+  main{padding-top:12px;gap:12px}
+  .view{gap:12px}
+  .panel{padding:14px}
+  h2{font-size:20px}
+  .chart-box{height:240px}
+  .filters{gap:8px}
+  .seg button{padding:6px 10px}
+  .big .val{font-size:38px}
+  .summary{display:none}
+  .inputs{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .inputs .f:first-child{grid-column:1/-1}
+  .inp{min-height:48px}
+  .inp input{font-size:22px}
+  .save-row .btns{width:100%}
+  .save-row #saveBtn{display:none}
+  th,td{padding:8px 6px}
+  .save-row .btns button{flex:1}
+  body.on-dash main{padding-bottom:calc(100px + env(safe-area-inset-bottom))}
+  body.on-dash .mbar{display:grid}
+  .mbar{grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;position:fixed;left:0;right:0;bottom:0;z-index:5;
+    background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(0,0,0,.08);
+    padding:10px max(16px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+  .mbar .lbl{font-size:12px;color:var(--muted);display:block}
+  .mbar .val{display:block;white-space:nowrap;font-family:var(--f-display);font-weight:700;font-size:26px;font-variant-numeric:tabular-nums;line-height:1.1}
+  .mbar .s{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .mbar button{min-height:46px}
+  body.on-dash .toast{bottom:calc(100px + env(safe-area-inset-bottom))}
+}
+@media (max-width:360px){.inputs{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<div id="app" data-own>
+  <header class="top">
+    <button type="button" class="burger" id="burger" aria-label="Abrir menu" aria-controls="drawer" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <h1 id="pageTitle">Dashboard</h1>
+  </header>
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-label="Menu" inert>
+    <div class="brand">Calculadora de Reajuste</div>
+    <nav>
+      <a href="#dashboard" data-view="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Dashboard</a>
+      <a href="#historico" data-view="historico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Histórico</a>
+      <a href="#configuracoes" data-view="configuracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Configurações</a>
+    </nav>
+  </aside>
+
+  <main>
+    <!-- DASHBOARD -->
+    <section class="view" id="v-dashboard">
+      <div class="panel">
+        <h2>Lucro bruto por litro</h2>
+        <div class="filters"><div class="per" style="display:flex;align-items:center;gap:8px">
+          <span class="sub">Últimos</span><div class="seg" role="group" aria-label="Período" id="periodSeg">
+            <button type="button" data-p="5" aria-label="Últimos 5 reajustes">5</button>
+            <button type="button" data-p="10">10</button>
+            <button type="button" data-p="20">20</button>
+            <button type="button" data-p="all">Todos</button>
+            <button type="button" data-p="custom">Escolher</button>
+          </div></div>
+          <div class="range" id="rangeBox" hidden>
+            <label for="rFrom">De</label><select id="rFrom"></select>
+            <label for="rTo">até</label><select id="rTo"></select>
+          </div>
+          <div class="chips" role="group" aria-label="Combustíveis no gráfico" id="fuelChips"></div>
+        </div>
+        <div class="chart-box"><canvas id="chart" role="img" aria-label="Gráfico de linhas do lucro bruto por litro em cada reajuste"></canvas><div class="chart-msg" id="chartMsg" hidden></div></div>
+      </div>
+
+      <div class="panel current" id="currentPanel">
+        <div class="big">
+          <div class="lbl">Média de lucro atual</div>
+          <div class="val" id="curVal"></div>
+          <div class="meta" id="curMeta"></div>
+        </div>
+        <div class="cur-fuels" id="curFuels"></div>
+      </div>
+
+      <div class="panel" id="novo">
+        <h2>Novo reajuste</h2>
+        <div class="summary" aria-live="polite">
+          <div class="stat"><span class="lbl">Média de lucro /L</span><span class="val" id="sML"></span><span id="sDelta"></span></div>
+          <div class="stat"><span class="lbl">Lucro Bruto Total</span><span class="val" id="sLB"></span></div>
+        </div>
+        <div class="grid" id="cards"></div>
+        <div class="save-row">
+          <div class="meta">
+            <div class="f"><label for="newDate">Data</label><input id="newDate" type="date"></div>
+          </div>
+          <div class="btns">
+            <button type="button" id="clearBtn">Limpar</button>
+            <button type="button" id="copyBtn">Copiar</button>
+            <button type="button" class="primary" id="saveBtn">Salvar reajuste</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTÓRICO -->
+    <section class="view" id="v-historico" hidden>
+      <div class="hist" id="histList"></div>
+    </section>
+
+    <!-- CONFIGURAÇÕES -->
+    <section class="view" id="v-configuracoes" hidden>
+      <div class="panel">
+        <div class="cfg-form">
+          <section>
+            <h3><label for="cFrete">Frete por litro</label></h3>
+            <div class="inp"><span>R$</span><input id="cFrete" inputmode="decimal" autocomplete="off"><span>/L</span></div>
+          </section>
+          <section>
+            <h3>Imposto</h3>
+            <div class="seg wide" role="group" aria-label="Forma de cálculo do imposto">
+              <button type="button" id="modePct">% sobre a venda</button>
+              <button type="button" id="modeFix">Valor fixo por litro</button>
+            </div>
+            <div id="pctBox" class="f">
+              <label for="cPct">Alíquota sobre o valor de venda</label>
+              <div class="inp"><input id="cPct" inputmode="decimal" autocomplete="off"><span>%</span></div>
+            </div>
+            <div id="fixBox" class="perfuel" hidden></div>
+          </section>
+          <div><button type="button" id="resetCfg">Restaurar padrão</button></div>
+          <section>
+            <h3>Dados</h3>
+            <p class="hint" id="syncInfo" hidden></p>
+            <div><button type="button" class="danger" id="restoreHist">Restaurar histórico original</button></div>
+          </section>
+          <section>
+            <h3>Backup</h3>
+            <p class="hint">Salva o histórico e as configurações num arquivo <code>.json</code>. Use para guardar uma cópia ou levar os dados para outro navegador ou aparelho.</p>
+            <div class="row-btns">
+              <button type="button" id="exportBk">Exportar backup</button>
+              <button type="button" id="importBk">Importar backup</button>
+              <input type="file" id="importFile" accept=".json,application/json" hidden>
+            </div>
+            <p class="hint" id="importInfo" hidden></p>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="mbar" aria-live="polite">
+    <div><span class="lbl">Média de lucro /L</span><span class="val" id="mML"></span><span class="s" id="mSub"></span></div>
+    <button type="button" class="primary" id="mSave">Salvar</button>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+</div>
+<script type="application/json" id="state" data-own>__STATE__</script>
+<script id="main" data-own>
+// Captura da estrutura original da página (antes de qualquer alteração), usada para salvar o histórico
+const OWN=[...document.querySelectorAll("[data-own]")].map(e=>({head:e.parentNode===document.head,id:e.id,html:e.outerHTML}));
+
+const FUELS=[
+  {id:"gas",nome:"Gasolina Comum",curto:"Gasolina",v:"--s-gas",shape:"circle"},
+  {id:"adt",nome:"Gasolina Aditivada",curto:"Aditivada",v:"--s-adt",shape:"rect"},
+  {id:"s10",nome:"Diesel S10",curto:"S10",v:"--s-s10",shape:"triangle"},
+  {id:"s500",nome:"Diesel S500",curto:"S500",v:"--s-s500",shape:"rectRot"}
+];
+const LS_STATE="calc-reajuste-state", LS_DRAFT="calc-reajuste-draft", LS_UI="calc-reajuste-ui";
+const ls={get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+
+const EMBED=JSON.parse(document.getElementById("state").textContent);
+// Configuração padrão ("Restaurar padrão"): vem de data/config.json, embutida pelo build
+const DEFAULT_CFG=JSON.parse(JSON.stringify(EMBED.padrao||EMBED.cfg));
+let state=EMBED;
+const local=ls.get(LS_STATE);
+if(local&&local.hist&&local.rev>state.rev)state=local;
+const ORIGINAL_HIST=JSON.parse(JSON.stringify(EMBED.seed));
+
+// Formatação pt-BR
+const nf={};const fmt=(x,d)=>(nf[d]||(nf[d]=new Intl.NumberFormat("pt-BR",{minimumFractionDigits:d,maximumFractionDigits:d}))).format(x);
+const brl=(x,d=2)=>"R$ "+fmt(x,d);
+function parseBR(s,isQty){s=String(s).trim().replace(/[R$\s%]/g,"");if(!s)return 0;if(isQty||s.includes(","))s=s.replace(/\./g,"").replace(",",".");const n=parseFloat(s);return isFinite(n)?n:0;}
+const fmtDate=d=>d?d.split("-").reverse().join("/"):"";
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// Cálculo (fórmulas da planilha): Custo = Compra + Frete + Imposto; Lucro = Venda − Custo
+function calc(itens){
+  const L=itens.map(it=>{
+    const imp=it.tm==="p"?it.v*it.t/100:it.t;
+    const custo=it.c+it.f+imp;
+    return {imp,custo,ct:it.q*custo,lucro:it.v-custo,fat:it.q*it.v,margem:it.v?(it.v-custo)/it.v*100:0};
+  });
+  const s=k=>L.reduce((a,l)=>a+l[k],0);
+  const ct=s("ct"),fat=s("fat");
+  return {L,vol:itens.reduce((a,i)=>a+i.q,0),ct,fat,lb:fat-ct,mc:s("custo")/4,ml:s("lucro")/4};
+}
+function draftItens(){
+  const c=state.cfg;
+  return FUELS.map(f=>{const d=draft.items[f.id];return {q:d.q,c:d.c,v:d.v,f:c.frete,tm:c.modo==="pct"?"p":"r",t:c.modo==="pct"?c.pct:(c.fixo[f.id]||0)};});
+}
+
+// Marcadores: forma + cor
+function marker(shape,colorVar){
+  const p={circle:'<circle cx="7" cy="7" r="5.5"/>',rect:'<rect x="1.5" y="1.5" width="11" height="11" rx="1"/>',triangle:'<path d="M7 1.2 13 12.5H1z"/>',rectRot:'<path d="M7 .8 13.2 7 7 13.2.8 7z"/>',line:'<rect x="0" y="5.5" width="14" height="3" rx="1.5"/>'}[shape];
+  return `<span class="mk" aria-hidden="true"><svg viewBox="0 0 14 14" style="fill:var(${colorVar})">${p}</svg></span>`;
+}
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+// Rascunho do novo reajuste
+let draft=ls.get(LS_DRAFT);
+if(!draft||!draft.items){
+  const last=state.hist[state.hist.length-1];
+  draft={items:{}};FUELS.forEach((f,i)=>{const it=last?last.itens[i]:{q:0,c:0,v:0};draft.items[f.id]={q:it.q,c:it.c,v:it.v};});
+}
+const saveDraft=()=>ls.set(LS_DRAFT,draft);
+
+let ui=Object.assign({period:"10",show:{avg:true,gas:true,adt:true,s10:true,s500:true},from:null,to:null},ls.get(LS_UI)||{});
+const saveUI=()=>ls.set(LS_UI,ui);
+
+// ---------- Persistência (o histórico fica salvo na própria página) ----------
+let art=null;
+const toJSON=o=>JSON.stringify(o).replace(/</g,"\\u003c");
+function compose(st){
+  const head=OWN.filter(o=>o.head).map(o=>o.html).join("\n");
+  const body=OWN.filter(o=>!o.head).map(o=>o.id==="state"?`<script type="application/json" id="state" data-own>${toJSON(st)}<\/script>`:o.html).join("\n");
+  return `<!DOCTYPE html>\n<html lang="pt-BR">\n<head>\n${head}\n</head>\n<body>\n${body}\n</body>\n</html>`;
+}
+let saving=false;
+async function persist(msg){
+  state.rev=(state.rev||0)+1;
+  ls.set(LS_STATE,state);
+  render();
+  if(!art){toast(msg+" (salvo neste navegador)");return;}
+  saving=true;
+  try{sessionStorage.setItem("calc-toast",msg);}catch(e){}
+  try{await art.publish(compose(state));toast(msg);}
+  catch(e){
+    try{sessionStorage.removeItem("calc-toast");}catch(_){}
+    const code=(e&&(e.code||e.name||e.message))||"";
+    if(/conflict/i.test(code))toast("Outra alteração foi salva ao mesmo tempo. A página vai recarregar.");
+    else toast(msg+" neste navegador. Não foi possível salvar na página.");
+  }finally{saving=false;}
+}
+function syncText(){
+  return art?"":"Salvando só neste navegador.";
+}
+
+// ---------- Navegação ----------
+const VIEWS={dashboard:"Dashboard",historico:"Histórico",configuracoes:"Configurações"};
+const burger=document.getElementById("burger"),drawer=document.getElementById("drawer");
+function setMenu(open){
+  document.body.classList.toggle("menu-open",open);
+  burger.setAttribute("aria-expanded",open);
+  if(open){drawer.removeAttribute("inert");drawer.querySelector('a[aria-current="page"]')?.focus();}
+  else{drawer.setAttribute("inert","");}
+}
+burger.onclick=()=>setMenu(!document.body.classList.contains("menu-open"));
+document.getElementById("scrim").onclick=()=>setMenu(false);
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&document.body.classList.contains("menu-open")){setMenu(false);burger.focus();}});
+drawer.addEventListener("click",e=>{if(e.target.closest("a"))setMenu(false);});
+function route(){
+  let v=location.hash.replace("#","");if(!VIEWS[v])v="dashboard";
+  Object.keys(VIEWS).forEach(k=>document.getElementById("v-"+k).hidden=k!==v);
+  drawer.querySelectorAll("a").forEach(a=>a.toggleAttribute("aria-current",a.dataset.view===v)||a.dataset.view===v&&a.setAttribute("aria-current","page"));
+  drawer.querySelectorAll("a").forEach(a=>{if(a.dataset.view===v)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");});
+  document.getElementById("pageTitle").textContent=VIEWS[v];
+  document.body.classList.toggle("on-dash",v==="dashboard");
+  if(v==="dashboard")drawChart();
+  if(v==="historico")renderHist();
+  if(v==="configuracoes")fillCfg();
+  window.scrollTo(0,0);
+}
+window.addEventListener("hashchange",route);
+const go=v=>{if(location.hash==="#"+v)route();else location.hash=v;};
+
+// ---------- Gráfico ----------
+let chart=null;
+function periodSlice(){
+  const n=state.hist.length;
+  if(ui.period==="all")return [0,n];
+  if(ui.period==="custom"){
+    let a=state.hist.findIndex(h=>h.id===ui.from),b=state.hist.findIndex(h=>h.id===ui.to);
+    if(a<0)a=0;if(b<0)b=n-1;if(a>b)[a,b]=[b,a];return [a,b+1];
+  }
+  const k=parseInt(ui.period,10)||10;return [Math.max(0,n-k),n];
+}
+const shortName=h=>h.nome.replace(/^Reajuste\s*/i,"R");
+function buildFilters(){
+  document.querySelectorAll("#periodSeg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.p===ui.period));
+  document.getElementById("rangeBox").hidden=ui.period!=="custom";
+  const opts=state.hist.map(h=>`<option value="${h.id}">${esc(h.nome)}${h.data?" · "+fmtDate(h.data):""}</option>`).join("");
+  const rf=document.getElementById("rFrom"),rt=document.getElementById("rTo");
+  rf.innerHTML=opts;rt.innerHTML=opts;
+  const [a,b]=periodSlice();
+  rf.value=state.hist[a]?.id;rt.value=state.hist[b-1]?.id;
+  const chips=[{id:"avg",nome:"Média dos 4",v:"--s-avg",shape:"line"},...FUELS.map(f=>({id:f.id,nome:f.curto,v:f.v,shape:f.shape}))];
+  document.getElementById("fuelChips").innerHTML=chips.map(c=>`<button type="button" class="chip" data-s="${c.id}" aria-pressed="${!!ui.show[c.id]}">${marker(c.shape,c.v)}${c.nome}</button>`).join("");
+}
+document.getElementById("periodSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.p==="custom"&&ui.period!=="custom"){const [a,z]=periodSlice();ui.from=state.hist[a]?.id;ui.to=state.hist[z-1]?.id;}
+  ui.period=b.dataset.p;saveUI();buildFilters();drawChart();
+});
+document.getElementById("rFrom").onchange=e=>{ui.from=e.target.value;ui.to=document.getElementById("rTo").value;saveUI();drawChart();};
+document.getElementById("rTo").onchange=e=>{ui.to=e.target.value;ui.from=document.getElementById("rFrom").value;saveUI();drawChart();};
+document.getElementById("fuelChips").addEventListener("click",e=>{
+  const b=e.target.closest(".chip");if(!b)return;
+  ui.show[b.dataset.s]=!ui.show[b.dataset.s];
+  if(!Object.values(ui.show).some(Boolean))ui.show[b.dataset.s]=true;
+  b.setAttribute("aria-pressed",ui.show[b.dataset.s]);saveUI();drawChart();
+});
+function drawChart(){
+  if(document.getElementById("v-dashboard").hidden)return;
+  const msg=document.getElementById("chartMsg");
+  const [a,b]=periodSlice();const rows=state.hist.slice(a,b);
+  if(typeof Chart==="undefined"){msg.hidden=false;msg.textContent="O gráfico não carregou. Verifique a conexão e abra a página de novo.";return;}
+  if(!rows.length){msg.hidden=false;msg.textContent="Nenhum reajuste salvo ainda.";if(chart){chart.destroy();chart=null;}return;}
+  msg.hidden=true;
+  const res=rows.map(h=>calc(h.itens));
+  const ink=css("--ink"),muted=css("--muted"),grid=css("--grid"),surface=css("--surface");
+  const ds=[];
+  FUELS.forEach((f,i)=>{if(!ui.show[f.id])return;const col=css(f.v);
+    ds.push({label:f.nome,data:res.map(r=>+r.L[i].lucro.toFixed(4)),borderColor:col,backgroundColor:col,pointStyle:f.shape,
+      borderWidth:2,pointRadius:rows.length>20?2.5:3.5,pointHoverRadius:6,pointBorderColor:surface,pointBorderWidth:1.5,cubicInterpolationMode:"monotone"});});
+  if(ui.show.avg)ds.push({label:"Média dos 4",data:res.map(r=>+r.ml.toFixed(4)),borderColor:css("--s-avg"),backgroundColor:css("--s-avg"),
+      borderWidth:3,borderDash:[6,4],pointRadius:rows.length>20?2:3,pointHoverRadius:6,pointBorderColor:surface,pointBorderWidth:1.5,cubicInterpolationMode:"monotone",order:-1});
+  const labels=rows.map(h=>h.data?fmtDate(h.data).slice(0,5):shortName(h));
+  const cfg={type:"line",data:{labels,datasets:ds},options:{
+    responsive:true,maintainAspectRatio:false,animation:matchMedia("(prefers-reduced-motion:reduce)").matches?false:{duration:250},
+    interaction:{mode:"index",intersect:false},
+    layout:{padding:{top:6,right:8}},
+    plugins:{legend:{display:false},
+      tooltip:{backgroundColor:surface,titleColor:ink,bodyColor:ink,borderColor:css("--line"),borderWidth:1,padding:10,usePointStyle:true,boxPadding:4,
+        titleFont:{family:"Barlow, system-ui, sans-serif",weight:"600"},bodyFont:{family:"Barlow, system-ui, sans-serif"},
+        callbacks:{title:it=>{const h=rows[it[0].dataIndex];return h.nome+(h.data?" · "+fmtDate(h.data):"");},
+                   label:c=>` ${c.dataset.label}: ${brl(c.parsed.y,4)}`}}},
+    scales:{
+      x:{grid:{display:false},border:{color:css("--line")},ticks:{color:muted,font:{family:"Barlow, system-ui, sans-serif",size:12},maxRotation:0,autoSkip:true,autoSkipPadding:10}},
+      y:{grid:{color:grid},border:{display:false},ticks:{color:muted,font:{family:"Barlow, system-ui, sans-serif",size:12},maxTicksLimit:6,callback:v=>"R$ "+fmt(v,2)},
+         title:{display:false}}
+    }}};
+  if(chart){chart.data=cfg.data;chart.options=cfg.options;chart.update();}
+  else chart=new Chart(document.getElementById("chart"),cfg);
+}
+const reTheme=()=>{if(chart){chart.destroy();chart=null;}drawChart();};
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",reTheme);
+new MutationObserver(reTheme).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+// ---------- Média atual ----------
+function deltaPill(d){
+  if(Math.abs(d)<0.00005)return `<span class="delta eq">igual</span>`;
+  return `<span class="delta ${d>0?"up":"down"}">${d>0?"▲":"▼"} ${brl(Math.abs(d),4)}</span>`;
+}
+function renderCurrent(){
+  const n=state.hist.length,cur=state.hist[n-1],prev=state.hist[n-2];
+  const panel=document.getElementById("currentPanel");
+  if(!cur){document.getElementById("curVal").textContent="—";document.getElementById("curMeta").textContent="Nenhum reajuste salvo.";document.getElementById("curFuels").innerHTML="";return;}
+  const r=calc(cur.itens),rp=prev?calc(prev.itens):null;
+  const mm=r.L.reduce((a,l)=>a+l.margem,0)/4;
+  const v=document.getElementById("curVal");v.innerHTML=`${brl(r.ml,4)} <span class="pct">${fmt(mm,1)}%</span>`;v.className="val "+(r.ml<0?"neg":"");
+  document.getElementById("curMeta").innerHTML=`${esc(cur.nome)}${cur.data?" · "+fmtDate(cur.data):""}${rp?" "+deltaPill(r.ml-rp.ml):""}`;
+  document.getElementById("curFuels").innerHTML=FUELS.map((f,i)=>`<div class="cf"><span class="n">${marker(f.shape,f.v)}${f.curto}</span><span class="v ${r.L[i].lucro<0?"neg":""}">${brl(r.L[i].lucro,4)}</span><span class="p">${fmt(r.L[i].margem,1)}%</span></div>`).join("");
+}
+
+// ---------- Novo reajuste ----------
+const fieldDefs=[{k:"c",label:"Compra",pre:"R$",suf:"/L",d:4},{k:"q",label:"Quantidade",pre:"",suf:"L",d:0,qty:true},{k:"v",label:"Venda",pre:"R$",suf:"/L",d:2}];
+const cards=document.getElementById("cards");
+cards.innerHTML=FUELS.map(f=>`<article class="card" style="--c:var(${f.v})">
+  <h3>${marker(f.shape,f.v)}${f.nome}</h3>
+  <div class="inputs">${fieldDefs.map(d=>`<div class="f"><label for="${f.id}-${d.k}">${d.label}</label><div class="inp">${d.pre?`<span>${d.pre}</span>`:""}<input id="${f.id}-${d.k}" inputmode="${d.qty?"numeric":"decimal"}" enterkeyhint="next" autocomplete="off" data-f="${f.id}" data-k="${d.k}"><span>${d.suf}</span></div></div>`).join("")}</div>
+  <dl class="res">
+    <div><dt>Custo /L</dt><dd id="r-${f.id}-custo"></dd></div>
+    <div><dt>Lucro /L</dt><dd id="r-${f.id}-lucro"></dd></div>
+  </dl></article>`).join("");
+const fmtField=(k,v)=>{const d=fieldDefs.find(x=>x.k===k);return v===0&&k!=="q"?"":fmt(v,d.d);};
+function fillInputs(){document.querySelectorAll("input[data-f]").forEach(i=>{i.value=fmtField(i.dataset.k,draft.items[i.dataset.f][i.dataset.k]);});}
+cards.addEventListener("input",e=>{const i=e.target;if(!i.dataset.f)return;draft.items[i.dataset.f][i.dataset.k]=parseBR(i.value,i.dataset.k==="q");saveDraft();renderNovo();});
+cards.addEventListener("focusout",e=>{const i=e.target;if(i.dataset.f)i.value=fmtField(i.dataset.k,draft.items[i.dataset.f][i.dataset.k]);});
+cards.addEventListener("focusin",e=>{const i=e.target;if(i.dataset.f)setTimeout(()=>i.select(),0);});
+cards.addEventListener("keydown",e=>{
+  if(e.key!=="Enter"||!e.target.dataset.f)return;e.preventDefault();
+  const all=[...document.querySelectorAll("input[data-f]")];const i=all.indexOf(e.target);
+  if(i<all.length-1){all[i+1].focus();all[i+1].scrollIntoView({block:"center",behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});}else e.target.blur();
+});
+function nextName(){let m=0;state.hist.forEach(h=>{const x=/(\d+)/.exec(h.nome);if(x)m=Math.max(m,+x[1]);});return "Reajuste "+(m+1);}
+function today(){const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);}
+function setStat(id,txt,sign){const el=document.getElementById(id);el.textContent=txt;el.classList.toggle("neg",sign<0);el.classList.toggle("pos",sign>0);}
+function renderNovo(){
+  const it=draftItens(),r=calc(it);
+  const cur=state.hist[state.hist.length-1],rc=cur?calc(cur.itens):null;
+  r.L.forEach((l,i)=>{const id=FUELS[i].id;
+    document.getElementById(`r-${id}-custo`).textContent=brl(l.custo,4);
+    const lu=document.getElementById(`r-${id}-lucro`);lu.textContent=brl(l.lucro,4);lu.className=l.lucro<0?"neg":"pos";
+  });
+  setStat("sML",brl(r.ml,4),r.ml);setStat("sLB",brl(r.lb),r.lb);
+  document.getElementById("sDelta").innerHTML=rc?deltaPill(r.ml-rc.ml).replace("</span>"," vs atual</span>"):"";
+  const mv=document.getElementById("mML");mv.textContent=brl(r.ml,4);mv.className="val "+(r.ml<0?"neg":"pos");
+  document.getElementById("mSub").textContent=(rc?`${r.ml>=rc.ml?"+":"−"}${brl(Math.abs(r.ml-rc.ml),4)} vs atual · `:"")+`Lucro total ${brl(r.lb)}`;
+  const dt=document.getElementById("newDate");if(!dt.value)dt.value=today();
+  return r;
+}
+document.getElementById("clearBtn").onclick=()=>{FUELS.forEach(f=>draft.items[f.id]={q:0,c:0,v:0});saveDraft();fillInputs();renderNovo();document.getElementById("gas-c").focus();};
+async function saveReajuste(){
+  if(saving)return;
+  const it=draftItens();
+  if(!it.some(x=>x.v>0&&x.c>0)){toast("Preencha compra e venda de pelo menos um combustível.");document.getElementById("gas-c").focus();return;}
+  const nome=nextName();
+  const data=document.getElementById("newDate").value||today();
+  state.hist.push({id:"h"+Date.now().toString(36),nome,data,itens:it.map(x=>({q:x.q,c:x.c,f:x.f,tm:x.tm,t:x.t,v:x.v}))});
+  await persist(nome+" salvo");
+}
+document.getElementById("saveBtn").onclick=saveReajuste;
+document.getElementById("mSave").onclick=saveReajuste;
+document.getElementById("copyBtn").onclick=async()=>{
+  const it=draftItens(),r=calc(it);
+  const linhas=FUELS.map((f,i)=>`${f.nome}: ${fmt(it[i].q,0)} L | compra ${brl(it[i].c,4)} | venda ${brl(it[i].v)} | custo/L ${brl(r.L[i].custo,4)} | lucro/L ${brl(r.L[i].lucro,4)}`);
+  const c=state.cfg;
+  const txt=[nextName(),...linhas,"",`Frete: ${brl(c.frete)}/L | Imposto: ${c.modo==="pct"?fmt(c.pct,2)+"% da venda":"valor fixo por litro"}`,
+    `Volume total: ${fmt(r.vol,0)} L`,`Custo total: ${brl(r.ct)}`,`Faturamento total: ${brl(r.fat)}`,`Lucro Bruto Total: ${brl(r.lb)}`,`Média de custo: ${brl(r.mc,4)}`,`Média de lucro: ${brl(r.ml,4)}`].join("\n");
+  try{await navigator.clipboard.writeText(txt);toast("Resumo copiado");}catch(e){toast("Não foi possível copiar neste navegador");}
+};
+
+// ---------- Histórico ----------
+function renderHist(){
+  const list=document.getElementById("histList");
+  const rows=state.hist.map((h,i)=>({h,i,r:calc(h.itens)}));
+  list.innerHTML=rows.slice().reverse().map(({h,i,r})=>{
+    const prev=rows[i-1];
+    return `<div class="hi" data-id="${h.id}">
+      <div class="hi-h">
+        <div class="head"><div class="t">${esc(h.nome)}</div>${h.data?`<div class="d">${fmtDate(h.data)}</div>`:""}</div>
+        <div class="m"><div class="lbl">Média de lucro /L</div><div class="v ${r.ml<0?"neg":""}">${brl(r.ml,4)}</div>${prev?deltaPill(r.ml-prev.r.ml).replace('class="delta','style="margin:2px 0 0" class="delta'):""}</div>
+        <div class="m"><div class="lbl">Lucro Bruto Total</div><div class="v">${brl(r.lb)}</div></div>
+      </div>
+      <details><summary></summary>
+        <div class="body">
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Combustível</th><th>Qtde (L)</th><th>Compra</th><th>Venda</th><th>Lucro /L</th></tr></thead>
+            <tbody>${FUELS.map((f,k)=>{const it=h.itens[k],l=r.L[k];return `<tr><td>${f.curto}</td><td>${fmt(it.q,0)}</td><td>${fmt(it.c,4)}</td><td>${fmt(it.v,2)}</td><td class="${l.lucro<0?"neg":""}">${fmt(l.lucro,4)}</td></tr>`;}).join("")}</tbody>
+          </table></div>
+          <div class="acts">
+            <label>Data <input type="date" value="${h.data||""}" data-act="date"></label>
+            <button type="button" data-act="base">Usar como base</button>
+            <button type="button" class="danger" data-act="del">Excluir</button>
+          </div>
+        </div>
+      </details>
+    </div>`;}).join("");
+}
+const histList=document.getElementById("histList");
+histList.addEventListener("click",async e=>{
+  const b=e.target.closest("button[data-act]");if(!b)return;
+  const id=b.closest(".hi").dataset.id,h=state.hist.find(x=>x.id===id);if(!h)return;
+  if(b.dataset.act==="base"){
+    FUELS.forEach((f,i)=>draft.items[f.id]={q:h.itens[i].q,c:h.itens[i].c,v:h.itens[i].v});saveDraft();fillInputs();renderNovo();
+    go("dashboard");setTimeout(()=>document.getElementById("novo").scrollIntoView({block:"start"}),50);toast(`Preços de ${h.nome} carregados`);
+  }
+  if(b.dataset.act==="del"){
+    if(b.dataset.armed!=="1"){b.dataset.armed="1";b.textContent="Toque de novo para excluir";setTimeout(()=>{if(b.isConnected){b.dataset.armed="";b.textContent="Excluir";}},4000);return;}
+    state.hist=state.hist.filter(x=>x.id!==id);await persist(h.nome+" excluído");
+  }
+});
+histList.addEventListener("change",async e=>{
+  const i=e.target;if(i.dataset.act!=="date")return;
+  const id=i.closest(".hi").dataset.id,h=state.hist.find(x=>x.id===id);if(!h)return;
+  h.data=i.value||null;await persist("Data atualizada");
+});
+
+// ---------- Configurações ----------
+const fixBox=document.getElementById("fixBox");
+fixBox.innerHTML=FUELS.map(f=>`<div class="f"><label for="fx-${f.id}">${f.nome}</label><div class="inp"><span>R$</span><input id="fx-${f.id}" data-fx="${f.id}" inputmode="decimal" autocomplete="off"><span>/L</span></div></div>`).join("");
+function fillCfg(){
+  const c=state.cfg;
+  document.getElementById("cFrete").value=fmt(c.frete,2);
+  document.getElementById("cPct").value=fmt(c.pct,2);
+  FUELS.forEach(f=>document.getElementById("fx-"+f.id).value=fmt(c.fixo[f.id]||0,4));
+  showMode();
+  {const si=document.getElementById("syncInfo");si.textContent=syncText();si.hidden=!si.textContent;}
+}
+function showMode(){
+  const m=state.cfg.modo;
+  document.getElementById("modePct").setAttribute("aria-pressed",m==="pct");
+  document.getElementById("modeFix").setAttribute("aria-pressed",m==="fix");
+  document.getElementById("pctBox").hidden=m!=="pct";fixBox.hidden=m!=="fix";
+}
+let cfgTimer=null;
+function cfgChanged(){ls.set(LS_STATE,state);renderNovo();clearTimeout(cfgTimer);cfgTimer=setTimeout(()=>persist("Configurações salvas"),900);}
+document.getElementById("modePct").onclick=()=>{state.cfg.modo="pct";showMode();cfgChanged();};
+document.getElementById("modeFix").onclick=()=>{state.cfg.modo="fix";showMode();cfgChanged();};
+const cfgView=document.getElementById("v-configuracoes");
+cfgView.addEventListener("input",e=>{
+  const t=e.target;
+  if(t.id==="cFrete")state.cfg.frete=parseBR(t.value);
+  else if(t.id==="cPct")state.cfg.pct=parseBR(t.value);
+  else if(t.dataset.fx)state.cfg.fixo[t.dataset.fx]=parseBR(t.value);
+  else return;
+  ls.set(LS_STATE,state);renderNovo();clearTimeout(cfgTimer);
+});
+cfgView.addEventListener("change",e=>{const t=e.target;if(t.id==="cFrete"||t.id==="cPct"||t.dataset.fx){t.value=fmt(parseBR(t.value),t.dataset.fx?4:2);cfgChanged();}});
+document.getElementById("resetCfg").onclick=()=>{state.cfg=JSON.parse(JSON.stringify(DEFAULT_CFG));fillCfg();cfgChanged();};
+document.getElementById("restoreHist").onclick=async e=>{
+  const b=e.target;
+  if(b.dataset.armed!=="1"){b.dataset.armed="1";b.textContent="Toque de novo: isso apaga os reajustes adicionados";setTimeout(()=>{b.dataset.armed="";b.textContent="Restaurar histórico original";},5000);return;}
+  state.hist=JSON.parse(JSON.stringify(ORIGINAL_HIST));await persist("Histórico original restaurado");
+};
+
+// ---------- Backup (exportar / importar JSON) ----------
+const hoje=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
+document.getElementById("exportBk").onclick=()=>{
+  const bk={app:"calculadora-reajuste",versao:1,exportado:new Date().toISOString(),cfg:state.cfg,hist:state.hist};
+  const url=URL.createObjectURL(new Blob([JSON.stringify(bk,null,1)],{type:"application/json"}));
+  const a=document.createElement("a");a.href=url;a.download=`reajustes-backup-${hoje()}.json`;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast(`Backup exportado (${state.hist.length} reajustes)`);
+};
+const num=x=>typeof x==="number"&&isFinite(x);
+function validarBackup(o){
+  if(!o||typeof o!=="object")return "O arquivo não é um backup válido.";
+  if(!Array.isArray(o.hist))return "O arquivo não tem a lista de reajustes (hist).";
+  const ids=new Set();
+  for(const h of o.hist){
+    const nome=h&&h.nome?`"${h.nome}"`:"um reajuste";
+    if(!h||typeof h.id!=="string"||!h.id||typeof h.nome!=="string")return `Reajuste sem id ou nome.`;
+    if(ids.has(h.id))return `Id repetido: ${h.id}.`;ids.add(h.id);
+    if(h.data!=null&&!/^\d{4}-\d{2}-\d{2}$/.test(h.data))return `Data inválida em ${nome}.`;
+    if(!Array.isArray(h.itens)||h.itens.length!==4)return `${nome} não tem os 4 combustíveis.`;
+    for(const it of h.itens)if(!it||!["q","c","f","t","v"].every(k=>num(it[k]))||(it.tm!=="p"&&it.tm!=="r"))return `Valores inválidos em ${nome}.`;
+  }
+  if(o.cfg!=null){
+    const c=o.cfg;
+    if(!num(c.frete)||!num(c.pct)||(c.modo!=="pct"&&c.modo!=="fix")||!c.fixo||!FUELS.every(f=>num(c.fixo[f.id])))return "As configurações do arquivo são inválidas.";
+  }
+  return null;
+}
+let pendingImport=null,importT=null;
+const importBtn=document.getElementById("importBk"),importFile=document.getElementById("importFile"),importInfo=document.getElementById("importInfo");
+function importMsg(t,err){importInfo.textContent=t;importInfo.hidden=!t;importInfo.classList.toggle("err",!!err);}
+function disarmImport(){pendingImport=null;importBtn.textContent="Importar backup";importBtn.classList.remove("danger");importMsg("");}
+importBtn.onclick=async()=>{
+  if(!pendingImport){importFile.value="";importFile.click();return;}
+  const bk=pendingImport;clearTimeout(importT);disarmImport();
+  state.hist=JSON.parse(JSON.stringify(bk.hist));
+  if(bk.cfg)state.cfg=JSON.parse(JSON.stringify(bk.cfg));
+  fillCfg();await persist(`Backup importado (${state.hist.length} reajustes)`);
+};
+importFile.onchange=async()=>{
+  const f=importFile.files&&importFile.files[0];if(!f)return;
+  let o;try{o=JSON.parse(await f.text());}catch(e){importMsg("Não foi possível ler o arquivo: não é um JSON válido.",true);return;}
+  const erro=validarBackup(o);if(erro){importMsg(erro,true);return;}
+  pendingImport=o;
+  importBtn.textContent="Toque de novo para substituir";importBtn.classList.add("danger");
+  importMsg(`${f.name}: ${o.hist.length} reajustes${o.cfg?" e configurações":""}. Isso substitui os ${state.hist.length} reajustes atuais${o.cfg?" e as configurações":""}.`);
+  clearTimeout(importT);importT=setTimeout(disarmImport,10000);
+};
+
+// ---------- Geral ----------
+let toastT=null;
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),2600);}
+function render(){
+  renderCurrent();renderNovo();buildFilters();drawChart();
+  if(!document.getElementById("v-historico").hidden)renderHist();
+}
+
+fillInputs();render();route();
+try{const m=sessionStorage.getItem("calc-toast");if(m){sessionStorage.removeItem("calc-toast");toast(m);}}catch(e){}
+(async()=>{
+  try{art=window.claude&&window.claude.use?await window.claude.use("artifact"):null;}catch(e){art=null;}
+  {const si=document.getElementById("syncInfo");si.textContent=syncText();si.hidden=!si.textContent;}
+  // Se havia alterações só neste navegador e agora é possível salvar na página, envia
+  if(art&&local&&local.rev>EMBED.rev){try{await art.publish(compose(state));}catch(e){}}
+})();
+</script>
+</body>
+</html>
