@@ -2,7 +2,7 @@
 
 App web de página única que substitui uma planilha de reajustes de preço de posto de combustível. Calcula custo, lucro e margem por litro dos quatro combustíveis em cada reajuste, guarda o histórico e mostra a evolução do lucro em gráfico.
 
-> **Os dados deste repositório são fictícios.** `data/` traz 12 reajustes de exemplo gerados por `scripts/gerar-exemplo.js`. Os dados reais ficam fora do Git, na pasta local `dados-reais/` (veja [Dados reais](#dados-reais)).
+> **O app vem em branco:** sem reajustes e com frete e imposto zerados. Preencha as Configurações e salve o primeiro reajuste, ou importe um backup em Configurações. Os dados reais ficam fora do Git, na pasta local `dados-reais/` (veja [Dados reais](#dados-reais)).
 
 ## Como usar
 
@@ -19,19 +19,17 @@ Comandos (Node.js, sem dependências):
 | `npm test` | Confere os cálculos e se `index.html` está em dia com o template |
 | `npm run build` | Gera `index.html` a partir de `src/app.template.html` + `data/` |
 | `npm run build:real` | Gera `dados-reais/index.html` com os dados reais (só local) |
-| `npm run exemplo` | Gera de novo os dados fictícios de `data/` |
 
 ## Conteúdo
 
 | Pasta / arquivo | O que é |
 |---|---|
-| `index.html` | Página pronta, com os dados de exemplo embutidos. Gerada por `scripts/build.js`. |
+| `index.html` | Página pronta, em branco. Gerada por `scripts/build.js`. |
 | `src/app.template.html` | Código do app, com `__STATE__` no lugar dos dados. É a base para editar. |
-| `data/historico.json` | Reajustes de exemplo (fictícios), no formato que o app usa. |
-| `data/config.json` | Frete e imposto de exemplo, usados também em "Restaurar padrão". |
+| `data/historico.json` | Histórico embutido na página. Vazio (`[]`) no repositório. |
+| `data/config.json` | Frete e imposto iniciais, usados também em "Restaurar padrão". Zerados no repositório. |
 | `scripts/build.js` | Junta template + `historico.json` + `config.json` numa página. |
-| `scripts/gerar-exemplo.js` | Gera os dados fictícios de `data/`. |
-| `tests/verificar_calculos.js` | Confere `calc()` contra um caso calculado à mão e uma implementação independente das fórmulas. |
+| `tests/verificar_calculos.js` | Confere `calc()` contra um caso calculado à mão e uma implementação independente das fórmulas, em 500 reajustes aleatórios. |
 | `design/tokens.md` | Cores, fontes e regras visuais. |
 | `dados-reais/` | **Fora do Git** (`.gitignore`). Dados reais, planilha original e página com os dados reais. |
 
@@ -42,6 +40,7 @@ A pasta `dados-reais/` existe só na máquina local e nunca vai para o GitHub. E
 | Arquivo | O que é |
 |---|---|
 | `historico.json`, `config.json` | Histórico e configurações reais |
+| `backup-dados-reais.json` | Backup no formato do app, para importar no celular ou em outro navegador |
 | `index.html` | Página com os dados reais (`npm run build:real`) |
 | `esperado_planilha.json` | Resultados da planilha original. Se existir, `npm test` confere os reajustes reais contra ele. |
 | `reajuste.xlsx`, `historico.csv`, `screenshots/` | Planilha original, exportação em CSV e capturas de tela |
@@ -66,7 +65,7 @@ O menu hambúrguer (canto superior esquerdo) abre a navegação lateral. Cada te
 - o botão "Usar como base", que copia os preços para o novo reajuste;
 - o botão Excluir, que pede um segundo toque para confirmar.
 
-**Configurações.** Frete em R$/L, aplicado aos quatro combustíveis. Imposto calculado como % sobre a venda ou como valor fixo por litro, um por combustível. "Restaurar padrão" volta para os valores de `config.json`; "Restaurar histórico original" volta para o histórico embutido na página e pede confirmação.
+**Configurações.** Frete em R$/L, aplicado aos quatro combustíveis. Imposto calculado como % sobre a venda ou como valor fixo por litro, um por combustível. "Restaurar padrão" volta para os valores de `config.json`; "Restaurar histórico original" volta para o histórico embutido na página e pede confirmação. Esse botão só aparece quando a página tem histórico embutido.
 
 **Backup.** Em Configurações, "Exportar backup" baixa `reajustes-backup-AAAA-MM-DD.json` com o histórico e as configurações (`{app, versao, exportado, cfg, hist}`). "Importar backup" lê esse arquivo, confere se cada reajuste tem id, nome, data válida e os 4 combustíveis com valores numéricos, mostra quantos reajustes serão substituídos e pede um segundo toque para confirmar. Aceita também um JSON de estado do app (`{cfg, hist, …}`).
 

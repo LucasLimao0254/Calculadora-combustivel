@@ -7,7 +7,6 @@
     "build": "node scripts/build.js",
     "build:real": "node scripts/build.js --dados dados-reais",
     "check": "node scripts/build.js --check",
-    "exemplo": "node scripts/gerar-exemplo.js",
     "test": "node tests/verificar_calculos.js && node scripts/build.js --check"
   }
 }

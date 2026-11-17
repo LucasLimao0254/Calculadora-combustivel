@@ -627,6 +627,7 @@ document.getElementById("copyBtn").onclick=async()=>{
 function renderHist(){
   const list=document.getElementById("histList");
   const rows=state.hist.map((h,i)=>({h,i,r:calc(h.itens)}));
+  if(!rows.length){list.innerHTML=`<p class="hint">Nenhum reajuste salvo ainda. Salve o primeiro no Dashboard ou importe um backup em Configurações.</p>`;return;}
   list.innerHTML=rows.slice().reverse().map(({h,i,r})=>{
     const prev=rows[i-1];
     return `<div class="hi" data-id="${h.id}">
@@ -701,6 +702,8 @@ cfgView.addEventListener("input",e=>{
 });
 cfgView.addEventListener("change",e=>{const t=e.target;if(t.id==="cFrete"||t.id==="cPct"||t.dataset.fx){t.value=fmt(parseBR(t.value),t.dataset.fx?4:2);cfgChanged();}});
 document.getElementById("resetCfg").onclick=()=>{state.cfg=JSON.parse(JSON.stringify(DEFAULT_CFG));fillCfg();cfgChanged();};
+// Sem histórico embutido na página (app em branco), não há o que restaurar
+document.getElementById("restoreHist").hidden=!ORIGINAL_HIST.length;
 document.getElementById("restoreHist").onclick=async e=>{
   const b=e.target;
   if(b.dataset.armed!=="1"){b.dataset.armed="1";b.textContent="Toque de novo: isso apaga os reajustes adicionados";setTimeout(()=>{b.dataset.armed="";b.textContent="Restaurar histórico original";},5000);return;}

@@ -28,7 +28,7 @@ conferir("caso manual", calc([P(1000, 5, 6), P(500, 5, 6), { q: 2000, c: 5.5, f:
   ml: (0.71 * 3 + 0.7) / 4                      // 0,7075
 });
 
-// 2) Implementação independente, aplicada a cada reajuste de data/historico.json
+// 2) Implementação independente, aplicada a 500 reajustes aleatórios (gerados aqui, não são dados)
 function referencia(itens) {
   let ct = 0, fat = 0, somaCusto = 0, somaLucro = 0;
   for (const it of itens) {
@@ -38,9 +38,16 @@ function referencia(itens) {
   }
   return { ct, fat, lb: fat - ct, mc: somaCusto / 4, ml: somaLucro / 4 };
 }
-const exemplo = JSON.parse(fs.readFileSync(path.join(root, "data/historico.json"), "utf8"));
-for (const h of exemplo) conferir(h.nome, calc(h.itens), referencia(h.itens));
-console.log(`Exemplo: ${exemplo.length} reajustes + caso manual conferidos.`);
+let semente = 42;
+const rnd = () => ((semente = (semente * 1664525 + 1013904223) >>> 0) / 2 ** 32);
+for (let n = 0; n < 500; n++) {
+  const itens = Array.from({ length: 4 }, () => {
+    const pct = rnd() < 0.7;
+    return { q: Math.floor(rnd() * 20000), c: 3 + rnd() * 4, f: rnd() * 0.5, tm: pct ? "p" : "r", t: pct ? rnd() * 3 : rnd() * 0.2, v: 3 + rnd() * 5 };
+  });
+  conferir(`aleatório ${n + 1}`, calc(itens), referencia(itens));
+}
+console.log("Caso manual + 500 reajustes aleatórios conferidos.");
 
 // 3) Opcional: dados reais contra a planilha original (só na máquina que tem a pasta dados-reais/)
 const espPath = path.join(root, "dados-reais/esperado_planilha.json");
