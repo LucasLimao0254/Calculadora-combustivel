@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" data-own>
 <meta name="theme-color" content="#18222b" data-own>
 <title data-own>Calculadora de Reajuste</title>
+<link rel="manifest" href="manifest.webmanifest" data-own>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml" data-own>
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" data-own>
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" data-own>
+<meta name="mobile-web-app-capable" content="yes" data-own>
+<meta name="apple-mobile-web-app-capable" content="yes" data-own>
+<meta name="apple-mobile-web-app-title" content="Reajuste" data-own>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" data-own>
 <link rel="preconnect" href="https://fonts.googleapis.com" data-own>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin data-own>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet" data-own>
@@ -335,6 +343,11 @@ tr:last-child td{border-bottom:0}
             <h3>Dados</h3>
             <p class="hint" id="syncInfo" hidden></p>
             <div><button type="button" class="danger" id="restoreHist">Restaurar histórico original</button></div>
+          </section>
+          <section id="installSec" hidden>
+            <h3>Instalar no celular</h3>
+            <p class="hint" id="installHint"></p>
+            <div><button type="button" class="primary" id="installBtn" hidden>Instalar app</button></div>
           </section>
           <section>
             <h3>Backup</h3>
@@ -765,6 +778,26 @@ function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t
 function render(){
   renderCurrent();renderNovo();buildFilters();drawChart();
   if(!document.getElementById("v-historico").hidden)renderHist();
+}
+
+// ---------- PWA: offline, instalação e armazenamento persistente ----------
+const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+if("serviceWorker" in navigator&&/^https?:$/.test(location.protocol)){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+// Pede ao navegador para não apagar os dados salvos (localStorage) quando faltar espaço
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
+{
+  const sec=document.getElementById("installSec"),btn=document.getElementById("installBtn"),hint=document.getElementById("installHint");
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  let evt=null;
+  if(!standalone&&ios){sec.hidden=false;hint.textContent="No Safari, toque em Compartilhar e depois em \"Adicionar à Tela de Início\".";}
+  window.addEventListener("beforeinstallprompt",e=>{
+    e.preventDefault();evt=e;sec.hidden=false;btn.hidden=false;
+    hint.textContent="Instala a calculadora como um app, com ícone na tela inicial e funcionando sem internet.";
+  });
+  btn.onclick=async()=>{if(!evt)return;evt.prompt();const r=await evt.userChoice.catch(()=>null);evt=null;btn.hidden=true;if(r&&r.outcome==="accepted")sec.hidden=true;};
+  window.addEventListener("appinstalled",()=>{sec.hidden=true;toast("App instalado");});
 }
 
 fillInputs();render();route();
