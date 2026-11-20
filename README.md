@@ -29,7 +29,7 @@ O app é um PWA: pode ser instalado com ícone na tela inicial e funciona sem in
 
 Os dados continuam no armazenamento do navegador do aparelho; o app instalado pede ao navegador para não apagá-los (`navigator.storage.persist()`). Exporte um backup de vez em quando.
 
-Arquivos do PWA: `manifest.webmanifest`, `sw.js` (service worker: página com rede primeiro e cache como reserva; Chart.js, fontes e ícones em cache) e `icons/` (gerados por `npm run icones`). Ao mudar a lista de arquivos em cache, aumente `VERSAO` em `sw.js`.
+Arquivos do PWA: `manifest.webmanifest`, `sw.js` (service worker: página com rede primeiro e cache como reserva; ícones Phosphor, fonte Inter e ícones do app em cache) e `icons/` (gerados por `npm run icones`). Ao mudar a lista de arquivos em cache, aumente `VERSAO` em `sw.js`.
 
 ## Conteúdo
 
@@ -58,27 +58,28 @@ A pasta `dados-reais/` existe só na máquina local e nunca vai para o GitHub. E
 
 ## Telas
 
-O menu hambúrguer (canto superior esquerdo) abre a navegação lateral. Cada tela tem seu endereço: `#dashboard`, `#historico` e `#configuracoes`.
+Design mobile-first no tema escuro **Nocturne**, com uma barra de abas embaixo. Cada aba tem seu endereço: `#inicio`, `#simular`, `#historico` e `#ajustes` (os antigos `#dashboard` e `#configuracoes` continuam funcionando). A última aba aberta fica guardada no aparelho.
 
-**Dashboard**
-1. Gráfico de linhas do lucro bruto por litro, com uma série por combustível e a média dos quatro tracejada.
-   - Filtro de período: últimos 5, 10 ou 20 reajustes, todos, ou um intervalo de/até.
-   - Filtro de combustível por botões, que funcionam também como legenda.
-2. Média de lucro atual, do último reajuste salvo: valor em R$/L, margem média em % e diferença para o reajuste anterior. Abaixo vêm o lucro e a margem de cada combustível.
-3. Novo reajuste: Compra, Quantidade e Venda de cada combustível. Mostra na hora o custo e o lucro por litro de cada um, a média de lucro (com a diferença para o atual) e o Lucro Bruto Total.
-   - Botões Limpar, Copiar (resumo em texto) e Salvar reajuste.
-   - O nome do novo reajuste é gerado sozinho (maior número existente + 1); a data vem preenchida com o dia.
-   - No celular, a média de lucro e o botão Salvar ficam numa barra fixa no rodapé.
+**Início**
+1. Gráfico do lucro bruto por litro (SVG próprio): uma linha por combustível e a média dos quatro tracejada, grade a cada R$ 0,50.
+   - Período: últimos 5, 10 ou 20 reajustes, ou todos.
+   - Chips de combustível ligam e desligam as séries e funcionam como legenda.
+2. Média de lucro atual (último reajuste salvo): valor em R$/L, margem média e variação contra o anterior. Abaixo, uma grade 2×2 com lucro e margem de cada combustível.
 
-**Histórico.** Reajustes do mais recente para o mais antigo, com média de lucro, diferença para o anterior e Lucro Bruto Total. Em "Detalhes" aparecem:
-- uma tabela com quantidade, compra, venda e lucro por litro de cada combustível;
-- a edição da data;
-- o botão "Usar como base", que copia os preços para o novo reajuste;
-- o botão Excluir, que pede um segundo toque para confirmar.
+**Simular** (novo reajuste, layout "Preço de venda")
+- Resumo **Atual × Cenário**: média de lucro /L, margem média e lucro total, com a variação da média.
+- Venda de cada combustível com botões − e + (R$ 0,01 por toque) e a linha "Lucro /L atual → cenário" com a variação.
+- "Compra e quantidade" recolhível, preenchido com os valores do último reajuste (aberto quando não há reajustes).
+- Data, Limpar, Copiar (resumo em texto) e **Salvar**, que vira "Salvo" por 1,8 s.
+- O nome é gerado sozinho (maior número existente + 1).
 
-**Configurações.** Frete em R$/L, aplicado aos quatro combustíveis. Imposto calculado como % sobre a venda ou como valor fixo por litro, um por combustível. "Restaurar padrão" volta para os valores de `config.json`; "Restaurar histórico original" volta para o histórico embutido na página e pede confirmação. Esse botão só aparece quando a página tem histórico embutido.
+**Histórico.** Do mais recente para o mais antigo, com média de lucro, variação e Lucro Bruto Total. Ao abrir um cartão: tabela por combustível, edição da data, **Usar como base** (copia os preços para Simular) e **Excluir** (o primeiro toque vira "Confirmar").
 
-**Backup.** Em Configurações, "Exportar backup" baixa `reajustes-backup-AAAA-MM-DD.json` com o histórico e as configurações (`{app, versao, exportado, cfg, hist}`). "Importar backup" lê esse arquivo, confere se cada reajuste tem id, nome, data válida e os 4 combustíveis com valores numéricos, mostra quantos reajustes serão substituídos e pede um segundo toque para confirmar. Aceita também um JSON de estado do app (`{cfg, hist, …}`).
+**Ajustes.**
+- Frete em R$/L e imposto como % da venda ou valor fixo por litro (um por combustível). "Restaurar padrão" volta para `config.json`.
+- Backup: **Exportar** baixa `reajustes-backup-AAAA-MM-DD.json` (`{app, versao, exportado, cfg, hist}`). **Importar** valida o arquivo (id, nome, data, os 4 combustíveis com valores numéricos) e mostra um quadro de confirmação com Cancelar e Substituir. Aceita também um JSON de estado do app (`{cfg, hist, …}`).
+- "Restaurar histórico original" só aparece quando a página tem histórico embutido.
+- "Instalar app" aparece quando o navegador permite instalar; no iPhone, aparecem as instruções.
 
 ## Regras de cálculo
 
@@ -139,8 +140,10 @@ O estado fica num `<script type="application/json" id="state">` dentro da própr
 
 ## Dependências
 
-- Chart.js 4.4.1 (`cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js`)
-- Google Fonts: Barlow e Barlow Condensed
+- Phosphor Icons 2.1.1, web font regular e fill (`cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1`)
+- Google Fonts: Inter 400 e 500
+
+O gráfico é SVG feito no próprio app, sem biblioteca.
 
 Não há etapa de compilação: é HTML, CSS e JavaScript puro num único arquivo.
 
@@ -150,6 +153,6 @@ Edite `src/app.template.html` (código) ou `data/historico.json` / `data/config.
 
 ## Limitações conhecidas
 
-- O filtro de período trabalha por quantidade de reajustes, não por datas, porque reajustes podem não ter data. Quando há datas, o eixo do gráfico mostra dd/mm.
+- O filtro de período trabalha por quantidade de reajustes, não por datas, porque reajustes podem não ter data.
 - As configurações aceitam um único frete para os quatro combustíveis. Reajustes antigos com fretes ou impostos diferentes entre combustíveis continuam corretos no histórico, mas não dá para criar um reajuste novo assim pelas configurações.
 - Duas pessoas salvando ao mesmo tempo: vale o primeiro salvamento, e a outra janela recarrega e perde a alteração (ela recebe um aviso).

@@ -1,11 +1,14 @@
 // Service worker: deixa o app funcionar offline depois do primeiro acesso.
 // - Página (navegação): rede primeiro, para pegar sempre a versão nova; sem rede, usa o cache.
-// - Chart.js, fontes e ícones: cache primeiro, atualizando em segundo plano.
+// - Ícones Phosphor, fonte Inter e ícones do app: cache primeiro, atualizando em segundo plano.
 // Mude VERSAO para forçar a limpeza dos caches antigos.
-const VERSAO = "v2";
+const VERSAO = "v3";
 const CACHE = "calc-reajuste-" + VERSAO;
 const BASE = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./icons/favicon-32.png",
-  "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"];
+  "https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css",
+  "https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css",
+  "https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/Phosphor.woff2",
+  "https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/Phosphor-Fill.woff2"];
 
 self.addEventListener("install", e => {
   // cache: "reload" ignora o cache HTTP do navegador (o GitHub Pages guarda arquivos por 10 min)
@@ -31,7 +34,7 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  const outros = ["cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com"];
+  const outros = ["cdn.jsdelivr.net", "fonts.googleapis.com", "fonts.gstatic.com"];
   if (url.origin === location.origin || outros.includes(url.hostname)) {
     e.respondWith(caches.match(req).then(cached => {
       const rede = fetch(req).then(res => {
