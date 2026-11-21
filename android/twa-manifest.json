@@ -20,22 +20,32 @@
     "path": "./android.keystore",
     "alias": "android"
   },
+  "appVersionName": "1.0.0",
   "appVersionCode": 1,
-  "appVersion": "1.0.0",
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://lucaslimao0254.github.io/Calculadora-combustivel/manifest.webmanifest",
   "fallbackType": "customtabs",
   "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
   "fullScopeUrl": "https://lucaslimao0254.github.io/Calculadora-combustivel/",
   "minSdkVersion": 24,
   "orientation": "any",
-  "fingerprints": [],
+  "fingerprints": [
+    {
+      "name": "chave-upload",
+      "value": "7F:63:E4:CF:57:91:B3:95:9D:EF:FF:6E:96:2E:62:73:94:7F:DB:CA:1C:7F:FA:CE:79:C0:BA:FB:51:99:60:33"
+    }
+  ],
   "additionalTrustedOrigins": [],
   "retainedBundles": [],
   "protocolHandlers": [],
-  "fileHandlers": []
+  "fileHandlers": [],
+  "displayOverride": [],
+  "appVersion": "1.0.0"
 }
