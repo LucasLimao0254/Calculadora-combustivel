@@ -27,6 +27,8 @@ O app é um PWA: pode ser instalado com ícone na tela inicial e funciona sem in
 - **Android (Chrome):** abra o site e use o botão **Instalar app** em Configurações, ou o menu ⋮ → *Instalar app*.
 - **iPhone (Safari):** Compartilhar → *Adicionar à Tela de Início*.
 
+**APK para Android:** a pasta [`android/`](android/README.md) gera um APK com o Bubblewrap (Trusted Web Activity). Veja o passo a passo lá.
+
 Os dados continuam no armazenamento do navegador do aparelho; o app instalado pede ao navegador para não apagá-los (`navigator.storage.persist()`). Exporte um backup de vez em quando.
 
 Arquivos do PWA: `manifest.webmanifest`, `sw.js` (service worker: página com rede primeiro e cache como reserva; ícones Phosphor, fonte Inter e ícones do app em cache) e `icons/` (gerados por `npm run icones`). Ao mudar a lista de arquivos em cache, aumente `VERSAO` em `sw.js`.

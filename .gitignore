@@ -4,3 +4,14 @@ Thumbs.db
 ~$*.xlsx
 .claude/
 dados-reais/
+
+# Android (Bubblewrap): chave de assinatura e saídas de build nunca vão para o Git
+android/*.keystore
+android/*.jks
+android/*.apk
+android/*.aab
+android/*.idsig
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties

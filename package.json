@@ -8,6 +8,10 @@
     "build:real": "node scripts/build.js --dados dados-reais",
     "check": "node scripts/build.js --check",
     "test": "node tests/verificar_calculos.js && node scripts/build.js --check",
-    "icones": "node scripts/gerar-icones.js"
+    "icones": "node scripts/gerar-icones.js",
+    "android:doctor": "cd android && npx --yes @bubblewrap/cli@1.27.0 doctor",
+    "android:update": "cd android && npx --yes @bubblewrap/cli@1.27.0 update --skipVersionUpgrade",
+    "android:build": "cd android && npx --yes @bubblewrap/cli@1.27.0 build",
+    "android:assetlinks": "cd android && npx --yes @bubblewrap/cli@1.27.0 fingerprint generateAssetLinks --output=assetlinks.json"
   }
 }
