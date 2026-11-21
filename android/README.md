@@ -8,6 +8,7 @@ primeiro acesso, pelo service worker.
 
 - **Ferramenta:** [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap) 1.27.0, do Google (via `npx`, sem instalar nada global).
 - **Configuração:** `twa-manifest.json` (nome, cores, ícones, pacote `io.github.lucaslimao0254.calculadora`).
+- **Requisito:** Android 7.0 ou mais novo (`minSdkVersion 24`, mínimo da biblioteca de TWA).
 - **Dados:** o app Android usa o armazenamento do Chrome do aparelho, o mesmo do site. Se o celular já tem os reajustes no site, eles aparecem no app.
 
 ## Pré-requisitos (uma vez só)
@@ -54,6 +55,14 @@ Rode os comandos na raiz do repositório (`C:\dev\calculadora-combustivel`).
 5. **Instalar no celular:** mande o `app-release-signed.apk` para o aparelho, abra e permita "instalar apps
    desconhecidos" quando o Android pedir. Com o cabo USB e a depuração ativada, também dá para usar
    `npx @bubblewrap/cli install`.
+
+## Problemas conhecidos
+
+- **"'gradlew.bat' não é reconhecido"**: acontece quando a proteção do Windows `NoDefaultCurrentDirectoryInExePath`
+  está ativa. Os comandos `npm run android:*` passam por `scripts/android.js`, que põe a pasta `android/` no PATH
+  durante o build e resolve isso. Não rode `npx @bubblewrap/cli build` direto.
+- **"keystore password was incorrect"**: a senha digitada não abre `android.keystore`. **Atenção:** nesse erro o
+  Bubblewrap mostra a senha digitada em texto puro no terminal. Feche a aba depois e não reutilize essa senha.
 
 ## Tirar a barra de endereço (opcional)
 

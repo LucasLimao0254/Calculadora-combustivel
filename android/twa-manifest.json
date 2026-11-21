@@ -31,7 +31,7 @@
   "isChromeOSOnly": false,
   "isMetaQuest": false,
   "fullScopeUrl": "https://lucaslimao0254.github.io/Calculadora-combustivel/",
-  "minSdkVersion": 21,
+  "minSdkVersion": 24,
   "orientation": "any",
   "fingerprints": [],
   "additionalTrustedOrigins": [],

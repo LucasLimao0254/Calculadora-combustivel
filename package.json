@@ -9,9 +9,9 @@
     "check": "node scripts/build.js --check",
     "test": "node tests/verificar_calculos.js && node scripts/build.js --check",
     "icones": "node scripts/gerar-icones.js",
-    "android:doctor": "cd android && npx --yes @bubblewrap/cli@1.27.0 doctor",
-    "android:update": "cd android && npx --yes @bubblewrap/cli@1.27.0 update --skipVersionUpgrade",
-    "android:build": "cd android && npx --yes @bubblewrap/cli@1.27.0 build",
-    "android:assetlinks": "cd android && npx --yes @bubblewrap/cli@1.27.0 fingerprint generateAssetLinks --output=assetlinks.json"
+    "android:doctor": "node scripts/android.js doctor",
+    "android:update": "node scripts/android.js update --skipVersionUpgrade",
+    "android:build": "node scripts/android.js build",
+    "android:assetlinks": "node scripts/android.js fingerprint generateAssetLinks --output=assetlinks.json"
   }
 }
