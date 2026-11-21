@@ -316,10 +316,12 @@ const dCompact=d=>`<span class="dc ${dCls(d)}">${caret(d)}${dShort(d)}</span>`;
 
 // Rascunho do novo reajuste (cenário)
 let draft=ls.get(LS_DRAFT);
-function draftFrom(h){const d={items:{},data:today()};FUELS.forEach((f,i)=>{const it=h?h.itens[i]:{q:0,c:0,v:0};d.items[f.id]={q:it.q,c:it.c,v:it.v};});return d;}
+function draftFrom(h){const d={items:{},data:null,dataManual:false};FUELS.forEach((f,i)=>{const it=h?h.itens[i]:{q:0,c:0,v:0};d.items[f.id]={q:it.q,c:it.c,v:it.v};});return d;}
 if(!draft||!draft.items)draft=draftFrom(last());
-if(!draft.data)draft.data=today();
 const saveDraft=()=>ls.set(LS_DRAFT,draft);
+// Data do novo reajuste: é sempre "hoje", a menos que o usuário tenha escolhido outra no campo
+// (rascunhos antigos sem dataManual voltam para hoje)
+const simDate=()=>draft.dataManual&&draft.data?draft.data:today();
 
 let ui=Object.assign({period:"10",show:{avg:true,gas:true,adt:true,s10:true,s500:true}},ls.get(LS_UI)||{});
 if(!["5","10","20","all"].includes(ui.period))ui.period="10";
@@ -350,12 +352,25 @@ async function persist(msg){
   }finally{saving=false;}
 }
 
+// Outra janela ou aba (ou o app instalado) salvou: adota o estado mais novo, para não sobrescrevê-lo depois
+window.addEventListener("storage",e=>{
+  if(e.key!==LS_STATE||!e.newValue)return;
+  let novo;try{novo=JSON.parse(e.newValue);}catch(_){return;}
+  if(!novo||!Array.isArray(novo.hist)||!(novo.rev>state.rev))return;
+  state=novo;histOpen=null;delArm=null;
+  const a=document.activeElement,digitando=a&&a.tagName==="INPUT"&&$("s-"+screen)?.contains(a);
+  if(!digitando)render();else if(screen==="simular")updSim();
+  toast("Atualizado com alterações de outra janela");
+});
+
 // Rótulos temporários (1,8 s): "Salvo", "Copiado", nome do arquivo exportado
-let flash=null,flashT=null;
-function setFlash(k,el,label,orig){
-  flash=k;clearTimeout(flashT);if(el)el.innerHTML=label;
-  flashT=setTimeout(()=>{flash=null;const e=el&&document.contains(el)?el:null;if(e)e.innerHTML=orig;},1800);
+// Cada rótulo tem seu próprio cronômetro; o botão é buscado pelo id na hora de voltar ao normal
+const flashOn=new Set(),flashT={};
+function setFlash(k,id,label,orig){
+  flashOn.add(k);clearTimeout(flashT[k]);const el=$(id);if(el)el.innerHTML=label;
+  flashT[k]=setTimeout(()=>{flashOn.delete(k);const e=$(id);if(e)e.innerHTML=orig;},1800);
 }
+const SAVE_LBL="Salvar",SAVED_LBL=`<i class="ph ph-check"></i>Salvo`,SAVE_ARM_LBL="Salvar mesmo assim";
 
 // ---------- Navegação por abas ----------
 const SCREENS=["inicio","simular","historico","ajustes"];
@@ -457,7 +472,7 @@ const fmtField=(k,v)=>k==="q"?fmt(v,0):(v===0?"":fmt(v,k==="c"?4:2));
 function renderSim(){
   const el=$("s-simular"),cur=last();
   if(custosOpen===null)custosOpen=!cur;
-  const saveLbl=flash==="save"?`<i class="ph ph-check"></i>Salvo`:"Salvar";
+  const saveLbl=flashOn.has("save")?SAVED_LBL:saveArm?SAVE_ARM_LBL:SAVE_LBL;
   el.innerHTML=`
   <header class="sh"><h3>Simular</h3><span class="aux">${esc(nextName())}</span></header>
   <div class="card cmp">
@@ -495,12 +510,13 @@ function renderSim(){
     <input class="inp" type="date" id="newDate">
     <div class="acts">
       <button type="button" class="btn btn-secondary" id="clearBtn"><i class="ph ph-eraser"></i>Limpar</button>
-      <button type="button" class="btn btn-secondary" id="copyBtn"><i class="ph ph-copy-simple"></i>${flash==="copy"?"Copiado":"Copiar"}</button>
+      <button type="button" class="btn btn-secondary" id="copyBtn"><i class="ph ph-copy-simple"></i>${flashOn.has("copy")?"Copiado":"Copiar"}</button>
     </div>
   </div>
-  <button type="button" class="btn btn-primary btn-block save" id="saveBtn">${saveLbl}</button>`;
+  <p class="err" id="saveWarn" role="alert" ${saveArm?"":"hidden"}>${saveArm?esc(saveArm):""}</p>
+  <button type="button" class="btn btn-primary btn-block save ${saveArm?"armed":""}" id="saveBtn">${saveLbl}</button>`;
   el.querySelectorAll("input[data-f]").forEach(i=>i.value=fmtField(i.dataset.k,draft.items[i.dataset.f][i.dataset.k]));
-  $("newDate").value=draft.data||today();
+  $("newDate").value=simDate();
   updSim();
 }
 function updSim(){
@@ -519,8 +535,8 @@ function updSim(){
 }
 {
   const el=$("s-simular");
-  el.addEventListener("input",e=>{const i=e.target;if(!i.dataset.f)return;draft.items[i.dataset.f][i.dataset.k]=parseBR(i.value,i.dataset.k==="q");saveDraft();updSim();});
-  el.addEventListener("change",e=>{if(e.target.id==="newDate"){draft.data=e.target.value||today();saveDraft();}});
+  el.addEventListener("input",e=>{const i=e.target;if(!i.dataset.f)return;draft.items[i.dataset.f][i.dataset.k]=parseBR(i.value,i.dataset.k==="q");saveDraft();disarmSave();updSim();});
+  el.addEventListener("change",e=>{if(e.target.id==="newDate"){const v=e.target.value;draft.data=v||null;draft.dataManual=!!v&&v!==today();if(!v)e.target.value=today();saveDraft();}});
   el.addEventListener("focusout",e=>{const i=e.target;if(i.dataset.f)i.value=fmtField(i.dataset.k,draft.items[i.dataset.f][i.dataset.k]);});
   el.addEventListener("focusin",e=>{const i=e.target;if(i.dataset.f)setTimeout(()=>{try{i.select();}catch(_){}},0);});
   el.addEventListener("keydown",e=>{
@@ -530,30 +546,41 @@ function updSim(){
   });
   el.addEventListener("click",async e=>{
     const st=e.target.closest("[data-step]");
-    if(st){const d=draft.items[st.dataset.f];d.v=Math.max(0,Math.round((d.v+0.01*+st.dataset.step)*100)/100);saveDraft();$("in-"+st.dataset.f+"-v").value=fmtField("v",d.v);updSim();return;}
+    if(st){const d=draft.items[st.dataset.f];d.v=Math.max(0,Math.round((d.v+0.01*+st.dataset.step)*100)/100);saveDraft();disarmSave();$("in-"+st.dataset.f+"-v").value=fmtField("v",d.v);updSim();return;}
     const b=e.target.closest("button");if(!b)return;
     if(b.id==="custosBtn"){custosOpen=!custosOpen;$("custosBox").hidden=!custosOpen;b.setAttribute("aria-expanded",custosOpen);b.querySelector("i").className="ph "+(custosOpen?"ph-caret-up":"ph-caret-down");}
-    else if(b.id==="clearBtn"){FUELS.forEach(f=>draft.items[f.id]={q:0,c:0,v:0});saveDraft();custosOpen=true;renderSim();}
+    else if(b.id==="clearBtn"){FUELS.forEach(f=>draft.items[f.id]={q:0,c:0,v:0});saveDraft();saveArm=null;custosOpen=true;renderSim();}
     else if(b.id==="copyBtn")copyResumo(b);
-    else if(b.id==="saveBtn")saveReajuste(b);
+    else if(b.id==="saveBtn")saveReajuste();
   });
 }
-async function saveReajuste(btn){
-  if(saving||flash==="save")return;
+// Combustível sem compra ou sem venda entra na média simples com lucro negativo (−frete −imposto),
+// como na planilha. Por isso o primeiro toque avisa e pede confirmação.
+let saveArm=null,saveArmT=null;
+function disarmSave(){if(!saveArm)return;saveArm=null;clearTimeout(saveArmT);const b=$("saveBtn"),w=$("saveWarn");if(b){b.innerHTML=SAVE_LBL;b.classList.remove("armed");}if(w){w.hidden=true;w.textContent="";}}
+async function saveReajuste(){
+  if(saving||flashOn.has("save"))return;
   const it=draftItens();
   if(!it.some(x=>x.v>0&&x.c>0)){toast("Preencha compra e venda de pelo menos um combustível.");if(!custosOpen){custosOpen=true;renderSim();}$("in-gas-c").focus();return;}
-  const nome=nextName(),data=draft.data||today();
+  const faltam=FUELS.filter((f,i)=>!(it[i].v>0&&it[i].c>0)).map(f=>f.curto);
+  if(faltam.length&&!saveArm){
+    saveArm=`${faltam.join(", ")} sem compra ou venda: ${faltam.length>1?"entram":"entra"} na média com lucro negativo. Toque de novo para salvar assim.`;
+    renderSim();clearTimeout(saveArmT);saveArmT=setTimeout(disarmSave,6000);return;
+  }
+  saveArm=null;clearTimeout(saveArmT);
+  const nome=nextName(),data=simDate();
   state.hist.push({id:"h"+Date.now().toString(36),nome,data,itens:it.map(x=>({q:x.q,c:x.c,f:x.f,tm:x.tm,t:x.t,v:x.v}))});
-  flash="save";
+  draft.data=null;draft.dataManual=false;saveDraft();
+  flashOn.add("save");
   await persist(nome+" salvo");
-  setFlash("save",$("saveBtn"),`<i class="ph ph-check"></i>Salvo`,"Salvar");
+  setFlash("save","saveBtn",SAVED_LBL,SAVE_LBL);
 }
 async function copyResumo(btn){
   const it=draftItens(),r=calc(it),c=state.cfg;
   const linhas=FUELS.map((f,i)=>`${f.nome}: ${fmt(it[i].q,0)} L | compra ${brl(it[i].c,4)} | venda ${brl(it[i].v)} | custo/L ${brl(r.L[i].custo,4)} | lucro/L ${brl(r.L[i].lucro,4)}`);
-  const txt=[nextName()+(draft.data?" · "+fmtDate(draft.data):""),...linhas,"",`Frete: ${brl(c.frete)}/L | Imposto: ${c.modo==="pct"?fmt(c.pct,2)+"% da venda":"valor fixo por litro"}`,
+  const txt=[nextName()+" · "+fmtDate(simDate()),...linhas,"",`Frete: ${brl(c.frete)}/L | Imposto: ${c.modo==="pct"?fmt(c.pct,2)+"% da venda":"valor fixo por litro"}`,
     `Volume total: ${fmt(r.vol,0)} L`,`Custo total: ${brl(r.ct)}`,`Faturamento total: ${brl(r.fat)}`,`Lucro Bruto Total: ${brl(r.lb)}`,`Média de custo: ${brl(r.mc,4)}`,`Média de lucro: ${brl(r.ml,4)}`].join("\n");
-  try{await navigator.clipboard.writeText(txt);setFlash("copy",btn,`<i class="ph ph-copy-simple"></i>Copiado`,`<i class="ph ph-copy-simple"></i>Copiar`);}
+  try{await navigator.clipboard.writeText(txt);setFlash("copy","copyBtn",`<i class="ph ph-copy-simple"></i>Copiado`,`<i class="ph ph-copy-simple"></i>Copiar`);}
   catch(e){toast("Não foi possível copiar neste navegador");}
 }
 
@@ -567,7 +594,7 @@ function renderHist(){
   ${n?`<div class="hlist">${rows.slice().reverse().map(({h,i,r})=>{
     const prev=rows[i-1],open=histOpen.has(h.id),d=prev?r.ml-prev.r.ml:null,arm=delArm===h.id;
     return `<div class="hcard ${open?"open":""}">
-      <button type="button" class="hrow" data-tog="${h.id}" aria-expanded="${open}">
+      <button type="button" class="hrow" data-tog="${esc(h.id)}" aria-expanded="${open}">
         <span class="l"><b>${esc(h.nome)}</b><small>${h.data?fmtDate(h.data):"sem data"} · Total ${brl(r.lb)}</small></span>
         <span class="r"><b class="${r.ml<0?"neg":""}">${brl(r.ml,4)}</b>${d!==null?`<small class="${dCls(d)}">${caret(d)}${brl(Math.abs(d),4)}</small>`:""}</span>
         <i class="ph ${open?"ph-caret-up":"ph-caret-down"}" aria-hidden="true"></i>
@@ -577,10 +604,10 @@ function renderHist(){
           <span></span><span class="th">Qtd</span><span class="th">Compra</span><span class="th">Venda</span><span class="th">Lucro</span>
           ${FUELS.map((f,k)=>{const it=h.itens[k],l=r.L[k].lucro;return `<span class="fn">${mk(f,"xs")}${f.curto}</span><span class="r">${fmt(it.q,0)}</span><span class="r">${fmt(it.c,4)}</span><span class="r">${fmt(it.v,2)}</span><span class="r ${l<0?"neg":""}">${fmt(l,4)}</span>`;}).join("")}
         </div>
-        <div class="hdate"><label for="d-${h.id}">Data</label><input class="inp" type="date" id="d-${h.id}" data-date="${h.id}" value="${h.data||""}"></div>
+        <div class="hdate"><label for="d-${esc(h.id)}">Data</label><input class="inp" type="date" id="d-${esc(h.id)}" data-date="${esc(h.id)}" value="${h.data||""}"></div>
         <div class="hbtns">
-          <button type="button" class="btn btn-primary" data-base="${h.id}"><i class="ph ph-copy-simple"></i>Usar como base</button>
-          <button type="button" class="btn btn-secondary danger ${arm?"armed":""}" data-del="${h.id}"><i class="ph ph-trash"></i>${arm?"Confirmar":"Excluir"}</button>
+          <button type="button" class="btn btn-primary" data-base="${esc(h.id)}"><i class="ph ph-copy-simple"></i>Usar como base</button>
+          <button type="button" class="btn btn-secondary danger ${arm?"armed":""}" data-del="${esc(h.id)}"><i class="ph ph-trash"></i>${arm?"Confirmar":"Excluir"}</button>
         </div>
       </div>`:""}
     </div>`;}).join("")}</div>`
@@ -641,6 +668,7 @@ function renderAjustes(){
       ?`Os ${n} reajustes e as configurações ficam salvos nesta página. Exporte um backup para guardar uma cópia ou levar a outro aparelho.`
       :`Os ${n} reajustes e as configurações ficam salvos só neste aparelho. Exporte um backup para levar a outro aparelho.`}</p></div>
     <button type="button" class="btn btn-primary start" id="exportBk"><i class="ph ph-download-simple"></i>Exportar backup</button>
+    ${canShareFiles&&touch&&!isIOS?`<button type="button" class="btn btn-secondary start" id="shareBk"><i class="ph ph-share-network"></i>Enviar backup</button>`:""}
     ${importState==="armed"?`<div class="confirm" role="alertdialog" aria-label="Confirmar importação">
         <span class="fname"><i class="ph ph-file-text" aria-hidden="true"></i>${esc(pendingImport.name)}</span>
         <p>Este backup tem ${pendingImport.obj.hist.length} reajuste${pendingImport.obj.hist.length===1?"":"s"}${pendingImport.obj.cfg?" e as configurações":""}. Os ${n} reajustes deste aparelho serão substituídos.</p>
@@ -673,7 +701,8 @@ function cfgChanged(){ls.set(LS_STATE,state);clearTimeout(cfgTimer);cfgTimer=set
     const b=e.target.closest("button");if(!b)return;
     if(b.dataset.modo){if(state.cfg.modo!==b.dataset.modo){state.cfg.modo=b.dataset.modo;renderAjustes();cfgChanged();}}
     else if(b.id==="resetCfg"){state.cfg=JSON.parse(JSON.stringify(DEFAULT_CFG));renderAjustes();cfgChanged();}
-    else if(b.id==="exportBk")exportar(b);
+    else if(b.id==="exportBk")exportar();
+    else if(b.id==="shareBk")compartilhar("shareBk");
     else if(b.id==="importBk"){importErr="";const f=$("importFile");f.value="";f.click();}
     else if(b.id==="impCancel"){importState="idle";pendingImport=null;renderAjustes();}
     else if(b.id==="impOk"){
@@ -692,13 +721,27 @@ function cfgChanged(){ls.set(LS_STATE,state);clearTimeout(cfgTimer);cfgTimer=set
 }
 
 // ---------- Backup (exportar / importar JSON) ----------
-function exportar(btn){
+function backupFile(){
   const nome=`reajustes-backup-${today()}.json`;
   const bk={app:"calculadora-reajuste",versao:1,exportado:new Date().toISOString(),cfg:state.cfg,hist:state.hist};
-  const url=URL.createObjectURL(new Blob([JSON.stringify(bk,null,1)],{type:"application/json"}));
+  return {nome,txt:JSON.stringify(bk,null,1)};
+}
+// Compartilhar arquivo (menu do sistema): no iPhone é o único jeito confiável de salvar o backup no app instalado
+const canShareFiles=(()=>{try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File(["{}"],"t.json",{type:"application/json"})]}));}catch(e){return false;}})();
+const touch=matchMedia("(pointer:coarse)").matches;
+async function compartilhar(id){
+  const {nome,txt}=backupFile();
+  try{await navigator.share({files:[new File([txt],nome,{type:"application/json"})],title:"Backup da Calculadora de Reajuste"});
+    setFlash(id,id,`<i class="ph ph-check"></i>${esc(nome)}`,id==="shareBk"?`<i class="ph ph-share-network"></i>Enviar backup`:`<i class="ph ph-download-simple"></i>Exportar backup`);}
+  catch(e){if(e&&e.name!=="AbortError")toast("Não foi possível compartilhar o backup.");}
+}
+function exportar(){
+  if(isIOS&&canShareFiles)return compartilhar("exportBk");
+  const {nome,txt}=backupFile();
+  const url=URL.createObjectURL(new Blob([txt],{type:"application/json"}));
   const a=document.createElement("a");a.href=url;a.download=nome;
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  setFlash("export",btn,`<i class="ph ph-check"></i>${esc(nome)}`,`<i class="ph ph-download-simple"></i>Exportar backup`);
+  setFlash("exportBk","exportBk",`<i class="ph ph-check"></i>${esc(nome)}`,`<i class="ph ph-download-simple"></i>Exportar backup`);
 }
 const num=x=>typeof x==="number"&&isFinite(x);
 function validarBackup(o){
@@ -708,6 +751,7 @@ function validarBackup(o){
   for(const h of o.hist){
     const nome=h&&h.nome?`"${h.nome}"`:"um reajuste";
     if(!h||typeof h.id!=="string"||!h.id||typeof h.nome!=="string")return `Reajuste sem id ou nome.`;
+    if(!/^[A-Za-z0-9_-]{1,64}$/.test(h.id))return `Id inválido em ${nome}: use só letras, números, - e _.`;
     if(ids.has(h.id))return `Id repetido: ${h.id}.`;ids.add(h.id);
     if(h.data!=null&&!/^\d{4}-\d{2}-\d{2}$/.test(h.data))return `Data inválida em ${nome}.`;
     if(!Array.isArray(h.itens)||h.itens.length!==4)return `${nome} não tem os 4 combustíveis.`;
